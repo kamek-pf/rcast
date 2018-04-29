@@ -2,7 +2,7 @@ extern crate dns_parser as dns;
 
 // use std::iter::Iterator;
 use std::str::FromStr;
-use std::net::{SocketAddr, Ipv4Addr, UdpSocket};
+use std::net::{Ipv4Addr, SocketAddr, UdpSocket};
 
 // use std::thread;
 // use std::net;
@@ -21,10 +21,14 @@ fn main() {
     let target_socket_addr = SocketAddr::new(multicast_addr.into(), MULTICAST_PORT);
     let loopback_socket_addr = SocketAddr::new(local_addr.into(), 0);
 
-    let listener_socket = UdpSocket::bind(&listener_socket_addr).expect("server couldn't bind to address");
-    listener_socket.join_multicast_v4(&multicast_addr, &local_addr).unwrap();
+    let listener_socket =
+        UdpSocket::bind(&listener_socket_addr).expect("server couldn't bind to address");
+    listener_socket
+        .join_multicast_v4(&multicast_addr, &local_addr)
+        .unwrap();
 
-    let client_socket = UdpSocket::bind(&loopback_socket_addr).expect("client couldn't bind to address");
+    let client_socket =
+        UdpSocket::bind(&loopback_socket_addr).expect("client couldn't bind to address");
     client_socket
         .connect(&target_socket_addr)
         .expect("connect function failed");
@@ -41,7 +45,7 @@ fn main() {
     // thread::sleep(ten_millis);
 
     for _ in 0..10 {
-        let mut buf = [0; 1000];
+        let mut buf = [0; 1500];
         match listener_socket.recv(&mut buf) {
             Ok(_received) => {
                 let raw_packet = dns::Packet::parse(&buf).unwrap();
@@ -51,9 +55,13 @@ fn main() {
 
                     if device_name == SERVICE_NAME {
                         println!("Found a cast device");
+                        if let dns::RRData::PTR(name) = a.data {
+                            // println!("{:?}", a);
+                            println!("{:?}", name.to_string());
+                        }
                     }
                 });
-            },
+            }
             Err(e) => println!("recv function failed: {:?}", e),
         };
     }
