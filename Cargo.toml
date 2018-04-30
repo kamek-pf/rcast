@@ -5,3 +5,4 @@ authors = ["Bertrand \"Kamek\" Bousquet <b.kamek@gmail.com>"]
 
 [dependencies]
 dns-parser = "0.7.1"
+librcast = { path = "./librcast" }

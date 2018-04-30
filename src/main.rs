@@ -1,8 +1,11 @@
 extern crate dns_parser as dns;
+extern crate librcast;
 
 // use std::iter::Iterator;
 use std::str::FromStr;
 use std::net::{Ipv4Addr, SocketAddr, UdpSocket};
+
+use librcast::device::Device;
 
 // use std::thread;
 // use std::net;
@@ -48,33 +51,11 @@ fn main() {
         let mut buf = [0; 400];
         match listener_socket.recv(&mut buf) {
             Ok(_received) => {
-                let raw_packet = dns::Packet::parse(&buf).unwrap();
-                // println!("{:?}", raw_packet);
-
-                raw_packet.answers.iter().for_each(|a| {
-                    let device_name = a.name.to_string();
-                    println!("Service name {:?}", device_name);
-                    // println!("{:?}", a);
-
-                    if device_name == SERVICE_NAME {
-                        if let dns::RRData::PTR(name) = a.data {
-                            // println!("{:?}", a);
-                            println!("Device name : {:?}", name.to_string());
-                        }
-                    }
-                });
-
-                raw_packet.additional.iter().for_each(|a| {
-                    if let dns::RRData::A(ip) = a.data {
-                        // println!("{:?}", a);
-                        println!("{:?}", ip);
-                    }
-
-                    if let dns::RRData::TXT(ref name) = a.data {
-                        // println!("{:?}", a);
-                        println!("TXT : {:?}", name.to_string());
-                    }
-                });
+                let packet = dns::Packet::parse(&buf).unwrap();
+                match Device::from_dns(&packet) {
+                    Ok(d) => println!("Found device {:?}", d),
+                    Err(e) => println!("Ignoring response : {:?}", e),
+                }
             }
             Err(e) => println!("recv function failed: {:?}", e),
         };

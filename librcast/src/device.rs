@@ -4,6 +4,8 @@ use std::net::Ipv4Addr;
 use uuid::Uuid;
 use dns_parser::{Packet, RRData};
 
+use discover::is_cast_device;
+
 #[derive(Debug)]
 pub struct Device {
     pub uuid: Uuid,
@@ -21,8 +23,17 @@ pub struct Device {
 // "id=ca2e93348ea78c867c5ee00e3e3b588dcd=F1D6D14A72EB22FC70176DB9D345FB2Erm=ve=05md=Google Home Miniic=/setup/icon.pngfn=Living Room speakerca=2052st=0bs=FA8FCA7B5D0Cnf=1rs="
 
 impl Device {
-    pub fn from_dns(packet: &Packet) -> i32 {
-        unimplemented!()
+    pub fn from_dns(packet: &Packet) -> Result<Self, Error> {
+        match is_cast_device(packet) {
+            true => Ok(Device {
+                uuid: Self::get_uuid(packet)?,
+                name: Self::get_name(packet)?,
+                model: Self::get_model(packet)?,
+                ip: Self::get_ip(packet)?,
+                port: Self::get_port(packet)?,
+            }),
+            false => Err(Error::InvalidServiceName),
+        }
     }
 
     fn get_uuid(packet: &Packet) -> Result<Uuid, Error> {
@@ -30,7 +41,7 @@ impl Device {
             .additional
             .iter()
             .filter_map(|a| match a.data {
-                RRData::SRV { .. } => Some(a),
+                RRData::A(_) => Some(a),
                 _ => None,
             })
             .next()
@@ -48,8 +59,21 @@ impl Device {
                 _ => None,
             })
             .next()
-            .ok_or(Error::MissingIpAddress)
-            .map(|info| info.split('.').next().unwrap().to_owned())
+            .ok_or(Error::MissingTxtRecord)
+            .and_then(|info| Self::get_name_from_txt(&info))
+    }
+
+    fn get_model(packet: &Packet) -> Result<String, Error> {
+        packet
+            .additional
+            .iter()
+            .filter_map(|a| match a.data {
+                RRData::TXT(ref info) => Some(info),
+                _ => None,
+            })
+            .next()
+            .ok_or(Error::MissingTxtRecord)
+            .and_then(|info| Self::get_model_from_txt(&info))
     }
 
     fn get_ip(packet: &Packet) -> Result<Ipv4Addr, Error> {
@@ -76,39 +100,47 @@ impl Device {
             .ok_or(Error::MissingPort)
     }
 
-    fn parse_device_name(device_name: &str) -> Result<(String, Uuid), Error> {
-        let mut split: Vec<&str> = device_name
-            .split('.')
-            .take(1)
+    fn get_name_from_txt(txt_record: &str) -> Result<String, Error> {
+        let parsed = txt_record
+            .split("fn=")
+            .skip(1)
             .next()
-            .unwrap() // can't fail, we always get something back
-            .split('-')
-            .collect();
+            .ok_or(Error::MalformedTxtRecord)?
+            .split("ca=")
+            .next()
+            .unwrap();
 
-        if split.len() < 2 {
-            return Err(Error::DeviceNameFormat(device_name.to_owned()));
-        }
+        Ok(parsed.to_owned())
+    }
 
-        let raw_uuid = split.pop().unwrap(); // same here
-        let uuid = Uuid::from_str(raw_uuid).map_err(|_| Error::InvalidUuid)?;
-        let model = &split.join(" ");
+    fn get_model_from_txt(txt_record: &str) -> Result<String, Error> {
+        let parsed = txt_record
+            .split("md=")
+            .skip(1)
+            .next()
+            .ok_or(Error::MalformedTxtRecord)?
+            .split("ic=")
+            .next()
+            .unwrap();
 
-        Ok((model.to_owned(), uuid))
+        Ok(parsed.to_owned())
     }
 }
 
 #[derive(Debug, Fail, PartialEq)]
-enum Error {
-    #[fail(display = "Device name doesn't match the expected format")]
-    DeviceNameFormat(String),
+pub enum Error {
+    #[fail(display = "The device doesn't appear to be Google Cast enabled")]
+    InvalidServiceName,
     #[fail(display = "Uuid found in PTR record is invalid")]
     InvalidUuid,
     #[fail(display = "Could not find device ip address in DNS response")]
     MissingIpAddress,
     #[fail(display = "Could not find device port in DNS response")]
     MissingPort,
-    #[fail(display = "Missing TXT record from DNS response, cannot get device name")]
+    #[fail(display = "Missing TXT record from DNS response, cannot get device information")]
     MissingTxtRecord,
+    #[fail(display = "Missing TXT record from DNS response, cannot get device information")]
+    MalformedTxtRecord,
 }
 
 #[cfg(test)]
@@ -116,56 +148,23 @@ mod test {
     use super::*;
 
     #[test]
-    fn parse_ptr() {
-        let uuid1 = Uuid::parse_str("bc7866b8d9b0a99263a2020cd11355f8").unwrap();
-        let uuid2 = Uuid::parse_str("ca2e93348ea78c867c5ee00e3e3b588d").unwrap();
-
-        let ptr_ok_1 = "Chromecast-Ultra-bc7866b8d9b0a99263a2020cd11355f8._googlecast._tcp.local";
-        let ptr_ok_2 = "Google-Home-Mini-ca2e93348ea78c867c5ee00e3e3b588d._googlecast._tcp.local";
-        let ptr_ok_3 = "GoogleCastThingy-ca2e93348ea78c867c5ee00e3e3b588d._googlecast._tcp.local";
-        let ptr_ok_4 =
-            "Random-Fake-Chromecast-Device-ca2e93348ea78c867c5ee00e3e3b588d._googlecast._tcp.local";
-        let ptr_ok_5 = "Missing-Mdns-Addr-Device-ca2e93348ea78c867c5ee00e3e3b588d._googlecast";
+    fn txt_parser() {
+        let txt_ok_1 = "id=bc7866b8d9b0a99263a2020cd11355f8cd=488042CE34BB67A545D1F0349D27A42Drm=475BF428D3B7BC4Bve=05md=Chromecast Ultraic=/setup/icon.pngfn=Salonca=4101st=0bs=FA8FCA73F8F8nf=1rs=";
+        let txt_ok_2 = "id=ca2e93348ea78c867c5ee00e3e3b588dcd=F1D6D14A72EB22FC70176DB9D345FB2Erm=ve=05md=Google Home Miniic=/setup/icon.pngfn=Living Room speakerca=2052st=0bs=FA8FCA7B5D0Cnf=1rs=";
 
         assert_eq!(
-            ("Chromecast Ultra".to_owned(), uuid1),
-            Device::parse_device_name(ptr_ok_1).unwrap()
+            "Chromecast Ultra",
+            Device::get_model_from_txt(txt_ok_1).unwrap()
         );
         assert_eq!(
-            ("Google Home Mini".to_owned(), uuid2),
-            Device::parse_device_name(ptr_ok_2).unwrap()
-        );
-        assert_eq!(
-            ("GoogleCastThingy".to_owned(), uuid2),
-            Device::parse_device_name(ptr_ok_3).unwrap()
-        );
-        assert_eq!(
-            ("Random Fake Chromecast Device".to_owned(), uuid2),
-            Device::parse_device_name(ptr_ok_4).unwrap()
-        );
-        assert_eq!(
-            ("Missing Mdns Addr Device".to_owned(), uuid2),
-            Device::parse_device_name(ptr_ok_5).unwrap()
+            "Google Home Mini",
+            Device::get_model_from_txt(txt_ok_2).unwrap()
         );
 
-        let ptr_ko_1 =
-            "Chromecast-Weird-Exa-bc7866b8d9b0a99263a2020cd1135iii._googlecast._tcp.local";
-        let ptr_ko_2 = "._googlecast._tcp.local";
-        let ptr_ko_3 = "lol wtf";
-        let ptr_ko_4 = "";
-
-        assert_eq!(Err(Error::InvalidUuid), Device::parse_device_name(ptr_ko_1));
+        assert_eq!("Salon", Device::get_name_from_txt(txt_ok_1).unwrap());
         assert_eq!(
-            Err(Error::DeviceNameFormat(ptr_ko_2.to_owned())),
-            Device::parse_device_name(ptr_ko_2)
-        );
-        assert_eq!(
-            Err(Error::DeviceNameFormat(ptr_ko_3.to_owned())),
-            Device::parse_device_name(ptr_ko_3)
-        );
-        assert_eq!(
-            Err(Error::DeviceNameFormat(ptr_ko_4.to_owned())),
-            Device::parse_device_name(ptr_ko_4)
+            "Living Room speaker",
+            Device::get_name_from_txt(txt_ok_2).unwrap()
         );
     }
 }
