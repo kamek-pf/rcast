@@ -45,24 +45,39 @@ fn main() {
     // thread::sleep(ten_millis);
 
     for _ in 0..10 {
-        let mut buf = [0; 1500];
+        let mut buf = [0; 400];
         match listener_socket.recv(&mut buf) {
             Ok(_received) => {
                 let raw_packet = dns::Packet::parse(&buf).unwrap();
+                // println!("{:?}", raw_packet);
 
                 raw_packet.answers.iter().for_each(|a| {
                     let device_name = a.name.to_string();
+                    println!("Service name {:?}", device_name);
+                    // println!("{:?}", a);
 
                     if device_name == SERVICE_NAME {
-                        println!("Found a cast device");
                         if let dns::RRData::PTR(name) = a.data {
                             // println!("{:?}", a);
-                            println!("{:?}", name.to_string());
+                            println!("Device name : {:?}", name.to_string());
                         }
+                    }
+                });
+
+                raw_packet.additional.iter().for_each(|a| {
+                    if let dns::RRData::A(ip) = a.data {
+                        // println!("{:?}", a);
+                        println!("{:?}", ip);
+                    }
+
+                    if let dns::RRData::TXT(ref name) = a.data {
+                        // println!("{:?}", a);
+                        println!("TXT : {:?}", name.to_string());
                     }
                 });
             }
             Err(e) => println!("recv function failed: {:?}", e),
         };
+        println!("====");
     }
 }
