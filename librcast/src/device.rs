@@ -24,15 +24,18 @@ pub struct Device {
 
 impl Device {
     pub fn from_dns(packet: &Packet) -> Result<Self, Error> {
-        match is_cast_device(packet) {
-            true => Ok(Device {
+        if is_cast_device(packet) {
+            let dev = Device {
                 uuid: Self::get_uuid(packet)?,
                 name: Self::get_name(packet)?,
                 model: Self::get_model(packet)?,
                 ip: Self::get_ip(packet)?,
                 port: Self::get_port(packet)?,
-            }),
-            false => Err(Error::InvalidServiceName),
+            };
+
+            Ok(dev)
+        } else {
+            Err(Error::InvalidServiceName)
         }
     }
 
@@ -139,7 +142,7 @@ pub enum Error {
     MissingPort,
     #[fail(display = "Missing TXT record from DNS response, cannot get device information")]
     MissingTxtRecord,
-    #[fail(display = "Missing TXT record from DNS response, cannot get device information")]
+    #[fail(display = "Malformed TXT record, cannot get device information")]
     MalformedTxtRecord,
 }
 
