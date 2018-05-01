@@ -12,11 +12,19 @@ static MULTICAST_PORT: u16 = 5353;
 
 type Error = ScanError;
 
-pub fn scan_for(time_millis: u64) -> Vec<Device> {
-    // let local_addr = Ipv4Addr::from_str(INTERFACE).unwrap();
-    // let multicast_addr = Ipv4Addr::from_str(MULTICAST_ADDR).unwrap();
-    // let listener_socket_addr = SocketAddr::new(local_addr.into(), MULTICAST_PORT);
-    unimplemented!();
+pub fn scan_for(time_millis: u64) -> Result<Vec<Device>, Error> {
+    let local_addr = Ipv4Addr::from_str(INTERFACE).unwrap();
+    let multicast_addr = Ipv4Addr::from_str(MULTICAST_ADDR).unwrap();
+
+    let listener_socket_addr = SocketAddr::new(local_addr.into(), MULTICAST_PORT);
+    let multicast_socket_addr = SocketAddr::new(multicast_addr.into(), MULTICAST_PORT);
+    let client_socket_addr = SocketAddr::new(local_addr.into(), 0);
+
+    let listener_socket = get_listener_socket(listener_socket_addr, &local_addr, &multicast_addr)?;
+    let client_socket = get_client_socket(client_socket_addr, multicast_socket_addr)?;
+
+    Ok(vec![])
+    // let client_socket = get_client_socket()
 }
 
 /// Figure out if a device is GCast enabled by looking at the DNS response
@@ -33,10 +41,10 @@ fn get_listener_socket(
     local_addr: &Ipv4Addr,
     multicast_addr: &Ipv4Addr,
 ) -> Result<UdpSocket, Error> {
-    let socket = UdpSocket::bind(&listener_socket_addr)
-        .map_err(|_| ScanError::ListnerSocketBind)?;
+    let socket = UdpSocket::bind(listener_socket_addr).map_err(|_| ScanError::ListnerSocketBind)?;
 
-    socket.join_multicast_v4(multicast_addr, local_addr)
+    socket
+        .join_multicast_v4(multicast_addr, local_addr)
         .map_err(|_| ScanError::CannotJoinMulticast)?;
 
     Ok(socket)
@@ -46,9 +54,7 @@ fn get_client_socket(
     client_socket_addr: SocketAddr,
     multicast_socket_addr: SocketAddr,
 ) -> Result<UdpSocket, Error> {
-    let socket =
-        UdpSocket::bind(&client_socket_addr)
-        .map_err(|_| ScanError::ClientSocketBind)?;
+    let socket = UdpSocket::bind(client_socket_addr).map_err(|_| ScanError::ClientSocketBind)?;
 
     socket
         .connect(multicast_socket_addr)
