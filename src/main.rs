@@ -47,18 +47,23 @@ fn main() {
     // let ten_millis = time::Duration::from_millis(1000);
     // thread::sleep(ten_millis);
 
-    for _ in 0..10 {
+    let mut devices: Vec<Device> = vec![];
+    for i in 0..10 {
         let mut buf = [0; 400];
         match listener_socket.recv(&mut buf) {
             Ok(_received) => {
                 let packet = dns::Packet::parse(&buf).unwrap();
-                match Device::from_dns(&packet) {
-                    Ok(d) => println!("Found device {:?}", d),
-                    Err(e) => println!("Ignoring response : {:?}", e),
+                if let Ok(d) = Device::from_dns_packet(&packet) {
+                    devices.push(d);
+                }
+
+                if i > 1 {
+                    break;
                 }
             }
             Err(e) => println!("recv function failed: {:?}", e),
         };
-        println!("====");
     }
+
+    println!("Packets : {:?}", devices);
 }
