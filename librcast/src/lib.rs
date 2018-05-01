@@ -5,4 +5,4 @@ extern crate dns_parser;
 extern crate failure;
 
 pub mod device;
-pub mod discover;
+pub mod scan;

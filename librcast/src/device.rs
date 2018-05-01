@@ -4,7 +4,7 @@ use std::net::Ipv4Addr;
 use uuid::Uuid;
 use dns_parser::{Packet, RRData};
 
-use discover::is_cast_device;
+use scan::is_cast_device;
 
 #[derive(Debug)]
 pub struct Device {
@@ -22,8 +22,10 @@ pub struct Device {
 // "id=bc7866b8d9b0a99263a2020cd11355f8cd=488042CE34BB67A545D1F0349D27A42Drm=475BF428D3B7BC4Bve=05md=Chromecast Ultraic=/setup/icon.pngfn=Salonca=4101st=0bs=FA8FCA73F8F8nf=1rs=""
 // "id=ca2e93348ea78c867c5ee00e3e3b588dcd=F1D6D14A72EB22FC70176DB9D345FB2Erm=ve=05md=Google Home Miniic=/setup/icon.pngfn=Living Room speakerca=2052st=0bs=FA8FCA7B5D0Cnf=1rs="
 
+type Error = DeviceError;
+
 impl Device {
-    pub fn from_dns(packet: &Packet) -> Result<Self, Error> {
+    pub fn from_dns_packet(packet: &Packet) -> Result<Self, Error> {
         if is_cast_device(packet) {
             let dev = Device {
                 uuid: Self::get_uuid(packet)?,
@@ -35,7 +37,7 @@ impl Device {
 
             Ok(dev)
         } else {
-            Err(Error::InvalidServiceName)
+            Err(DeviceError::InvalidServiceName)
         }
     }
 
@@ -48,9 +50,9 @@ impl Device {
                 _ => None,
             })
             .next()
-            .ok_or(Error::MissingPort)
+            .ok_or(DeviceError::MissingPort)
             .map(|a| a.name.to_string().split('.').next().unwrap().to_owned())
-            .and_then(|str_uuid| Uuid::from_str(&str_uuid).map_err(|_| Error::InvalidUuid))
+            .and_then(|str_uuid| Uuid::from_str(&str_uuid).map_err(|_| DeviceError::InvalidUuid))
     }
 
     fn get_name(packet: &Packet) -> Result<String, Error> {
@@ -62,7 +64,7 @@ impl Device {
                 _ => None,
             })
             .next()
-            .ok_or(Error::MissingTxtRecord)
+            .ok_or(DeviceError::MissingTxtRecord)
             .and_then(|info| Self::get_name_from_txt(&info))
     }
 
@@ -75,8 +77,8 @@ impl Device {
                 _ => None,
             })
             .next()
-            .ok_or(Error::MissingTxtRecord)
-            .and_then(|info| Self::get_model_from_txt(&info))
+            .ok_or(DeviceError::MissingTxtRecord)
+            .and_then(|info| Self::get_model_from_txt(info))
     }
 
     fn get_ip(packet: &Packet) -> Result<Ipv4Addr, Error> {
@@ -88,7 +90,7 @@ impl Device {
                 _ => None,
             })
             .next()
-            .ok_or(Error::MissingIpAddress)
+            .ok_or(DeviceError::MissingIpAddress)
     }
 
     fn get_port(packet: &Packet) -> Result<u16, Error> {
@@ -100,7 +102,7 @@ impl Device {
                 _ => None,
             })
             .next()
-            .ok_or(Error::MissingPort)
+            .ok_or(DeviceError::MissingPort)
     }
 
     fn get_name_from_txt(txt_record: &str) -> Result<String, Error> {
@@ -108,7 +110,7 @@ impl Device {
             .split("fn=")
             .skip(1)
             .next()
-            .ok_or(Error::MalformedTxtRecord)?
+            .ok_or(DeviceError::MalformedTxtRecord)?
             .split("ca=")
             .next()
             .unwrap();
@@ -121,7 +123,7 @@ impl Device {
             .split("md=")
             .skip(1)
             .next()
-            .ok_or(Error::MalformedTxtRecord)?
+            .ok_or(DeviceError::MalformedTxtRecord)?
             .split("ic=")
             .next()
             .unwrap();
@@ -131,7 +133,7 @@ impl Device {
 }
 
 #[derive(Debug, Fail, PartialEq)]
-pub enum Error {
+pub enum DeviceError {
     #[fail(display = "The device doesn't appear to be Google Cast enabled")]
     InvalidServiceName,
     #[fail(display = "Uuid found in PTR record is invalid")]
