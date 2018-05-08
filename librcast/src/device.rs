@@ -4,7 +4,7 @@ use std::net::Ipv4Addr;
 use uuid::Uuid;
 use dns_parser::{Packet, RRData};
 
-use scan::is_cast_device;
+use discovery::is_cast_device;
 
 #[derive(Debug)]
 pub struct Device {
