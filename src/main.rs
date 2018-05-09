@@ -4,5 +4,9 @@ use librcast::discovery;
 
 fn main() {
     let devices = discovery::scan();
-    println!("{:?}", devices);
+    if let Ok(devices) = devices {
+        for device in devices {
+            println!("{:?}", device);
+        }
+    }
 }

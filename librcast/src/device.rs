@@ -6,7 +6,7 @@ use dns_parser::{Packet, RRData};
 
 use discovery::is_cast_device;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Device {
     pub uuid: Uuid,
     pub name: String,

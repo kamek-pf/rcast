@@ -27,17 +27,19 @@ pub fn scan_for(duration: Duration) -> Result<Vec<Device>, Error> {
     broadcast(client_socket)?;
 
     // Listen DNS responses and push valid devices through the channel
-    thread::spawn(move || loop {
+    thread::spawn(move || {
         let mut buf = [0; 1500];
-        let res = listener_socket
-            .recv(&mut buf)
-            .map_err(|_| ScanError::Timeout)
-            .and_then(|_| Packet::parse(&buf).map_err(|_| ScanError::MalformedResponse))
-            .and_then(|p| Device::from_dns_packet(&p).map_err(|_| ScanError::NotChromecast))
-            .and_then(|d| sender.send(d).map_err(|_| ScanError::Timeout));
+        loop {
+            let res = listener_socket
+                .recv(&mut buf)
+                .map_err(|_| ScanError::Timeout)
+                .and_then(|_| Packet::parse(&buf).map_err(|_| ScanError::MalformedResponse))
+                .and_then(|p| Device::from_dns_packet(&p).map_err(|_| ScanError::NotChromecast))
+                .and_then(|d| sender.send(d).map_err(|_| ScanError::Timeout));
 
-        if let Err(ScanError::Timeout) = res {
-            break;
+            if let Err(ScanError::Timeout) = res {
+                break;
+            }
         }
     });
 
@@ -47,6 +49,11 @@ pub fn scan_for(duration: Duration) -> Result<Vec<Device>, Error> {
             Ok(d) => devices.push(d),
             Err(_) => break,
         }
+    }
+
+    if devices.len() >= 2 {
+        devices.sort();
+        devices.dedup_by(|a, b| a.uuid == b.uuid);
     }
 
     Ok(devices)
@@ -141,9 +148,3 @@ pub enum ScanError {
     #[fail(display = "The device found doesnt appear to be a Chromecast")]
     NotChromecast,
 }
-
-// impl From<DeviceError> for ScanError {
-//     fn from(err: DeviceError) -> ScanError {
-//         ScanError::NotChromecast
-//     }
-// }
