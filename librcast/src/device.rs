@@ -15,13 +15,6 @@ pub struct Device {
     pub port: u16,
 }
 
-// Check answers => a.name.to_string() == SERVICE_NAME, then
-// additional.data where A(ip) => ip, name.to_string() => uuid
-// additional.data SRV(record) => port
-// additional.data TXT(desc) => model / name
-// "id=bc7866b8d9b0a99263a2020cd11355f8cd=488042CE34BB67A545D1F0349D27A42Drm=475BF428D3B7BC4Bve=05md=Chromecast Ultraic=/setup/icon.pngfn=Salonca=4101st=0bs=FA8FCA73F8F8nf=1rs=""
-// "id=ca2e93348ea78c867c5ee00e3e3b588dcd=F1D6D14A72EB22FC70176DB9D345FB2Erm=ve=05md=Google Home Miniic=/setup/icon.pngfn=Living Room speakerca=2052st=0bs=FA8FCA7B5D0Cnf=1rs="
-
 type Error = DeviceError;
 
 impl Device {
