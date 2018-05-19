@@ -7,3 +7,4 @@ extern crate failure;
 
 pub mod device;
 pub mod discovery;
+pub mod media;
