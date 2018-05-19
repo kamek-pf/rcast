@@ -13,6 +13,7 @@ use matroska::Matroska;
 // Audio : AC3 ?
 // watch number of channels ?
 
+#[derive(Debug)]
 pub struct Media {
     pub path: PathBuf,
     pub info: MediaInfo,
@@ -61,6 +62,7 @@ impl Media {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct MediaInfo {
     pub container: Container,
     pub video_codec: VideoCodec,
@@ -68,16 +70,19 @@ pub struct MediaInfo {
     pub audio_channels: u8,
 }
 
+#[derive(Debug, PartialEq)]
 pub enum Container {
     Mkv,
     Webm,
 }
 
+#[derive(Debug, PartialEq)]
 pub enum VideoCodec {
     Mpeg4Avc, // h.264
     Vp8,
 }
 
+#[derive(Debug, PartialEq)]
 pub enum AudioCodec {
     Aac,
     Ac3,
@@ -99,11 +104,14 @@ mod test {
     use super::*;
 
     #[test]
-    fn path_parser() {
-        let p1 = Path::new("Cargo.lock");
-        let p2 = Path::new("!!huehue");
-
-        assert!(p1.exists());
-        // assert!(p2.exists());
+    fn container_parser() {
+        let c1 = Media::get_container(Path::new("jaja.MKV"));
+        let c2 = Media::get_container(Path::new("jaja.webm"));
+        let c3 = Media::get_container(Path::new("jaja.noob"));
+        let c4 = Media::get_container(Path::new("jaja"));
+        assert_eq!(c1, Some(Container::Mkv));
+        assert_eq!(c2, Some(Container::Webm));
+        assert!(c3.is_none());
+        assert!(c4.is_none());
     }
 }
