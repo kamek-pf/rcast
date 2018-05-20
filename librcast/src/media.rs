@@ -16,7 +16,7 @@ use matroska::Matroska;
 #[derive(Debug)]
 pub struct Media {
     pub path: PathBuf,
-    pub info: MediaInfo,
+    pub metadata: Matroska
 }
 
 type Error = MediaError;
@@ -25,21 +25,17 @@ impl Media {
     pub fn new(from: &str) -> Result<Self, Error> {
         let path = Path::new(from);
         let mut file = File::open(&path).map_err(|_| MediaError::FileNotFound)?;
-        let file = Matroska::open(file).map_err(|_| MediaError::UnsupportedFormat)?;
+        let mkv = Matroska::open(file).map_err(|_| MediaError::UnsupportedFormat)?;
 
         let media = Media {
             path: path.to_path_buf(),
-            info: Self::get_info(&path)?,
+            metadata: mkv,
         };
 
         Ok(media)
     }
 
-    fn get_info(path: &Path) -> Result<MediaInfo, MediaError> {
-        unimplemented!()
-    }
-
-    fn get_container(file: &Path) -> Option<Container> {
+    pub fn get_container(file: &Path) -> Option<Container> {
         file.extension()
             .and_then(|os_str| os_str.to_str())
             .and_then(|e| match e.to_lowercase().as_ref() {
@@ -48,26 +44,6 @@ impl Media {
                 _ => None
             })
     }
-
-    fn get_video_codec(file: &Matroska) -> VideoCodec {
-        unimplemented!()
-    }
-
-    fn get_audio_codec(file: &Matroska) -> AudioCodec {
-        unimplemented!()
-    }
-
-    fn get_audio_channels(file: &Matroska) -> u8 {
-        unimplemented!()
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct MediaInfo {
-    pub container: Container,
-    pub video_codec: VideoCodec,
-    pub audio_codec: AudioCodec,
-    pub audio_channels: u8,
 }
 
 #[derive(Debug, PartialEq)]
@@ -102,6 +78,17 @@ pub enum MediaError {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn read_files() {
+        let p1 = "/home/kamek/xdcc/KareRaisu.[HorribleSubs]_Dragon_Ball_Super_-_100_[1080p].mkv";
+        let m1 = Media::new(p1);
+        assert!(m1.is_ok());
+
+        if let Ok(m) = m1 {
+            println!("{:?}", m.metadata.tracks)
+        }
+    }
 
     #[test]
     fn container_parser() {
